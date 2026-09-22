@@ -47,6 +47,7 @@ app.post("/",sValidator("json",createKeySchema),async (c)=>{
   return c.json({id:apiKey.id,key: raw},201);
 })
 
+//delete User
 app.delete("/:id", async c => {
 
   const { sub: userId } = c.var.jwtPayload
