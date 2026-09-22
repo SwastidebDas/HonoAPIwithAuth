@@ -60,7 +60,7 @@ app.post("/login", sValidator("json", loginSchema), async (c) => {
   
   const now=Math.floor(Date.now()/1000);
 
-  const token= await sign({exp: now+JWT_EXPIRATION_SECONDS,sub: existing.id , email: existing.email},env.JWT_SECRET,);
+  const token= await sign({exp: now+JWT_EXPIRATION_SECONDS,sub: existing.id , email: existing.email},env.JWT_SECRET, "HS256");
 
   return c.json({token});
 });
