@@ -4,7 +4,7 @@ import z from "zod";
 import { db } from "../db/db.ts";
 import { AuthorTable } from "../db/schema.ts";
 import { eq } from "drizzle-orm";
-
+import { apiKeyAuth, type ApiKeyEnv } from "../middleware/auth.ts";
 const app = new Hono();
 
 type Author = {
@@ -38,28 +38,39 @@ app.get("/:id",async (c)=>{
     return c.json(author);
 });
 
-// the sValidator is a kind of a middleware that exposes the validated data to the hono context c
-app.post("/",sValidator("json",createAuthorSchema), async(c)=>{
-    const data = c.req.valid("json");
-    const newAuthor=await db.insert(AuthorTable).values(data).returning();
-    return c.json(newAuthor,201);
-});
+const protectedApp = new Hono<ApiKeyEnv>()
+protectedApp.use(apiKeyAuth)
 
-app.put("/:id",sValidator("json",updateAuthorSchema),async (c)=>{
-    const data= c.req.valid("json");
-    const id= c.req.param("id");
-    const currAuthor = await db.update(AuthorTable).set(data).where(eq(AuthorTable.id,id)).returning();
+protectedApp.post("/", sValidator("json", createAuthorSchema), async c => {
+  const data = c.req.valid("json")
+  const [author] = await db.insert(AuthorTable).values(data).returning()
 
-    if(currAuthor==null)
-        {
-            return c.json({error: "User not Found"},404);
-        }
-    return c.json(currAuthor,201);
-});
+  return c.json(author, 201)
+})
 
-app.delete("/:id",async (c)=>{
-    const id= c.req.param("id");
-    await db.delete(AuthorTable).where(eq(AuthorTable.id,id))
-    return c.body(null,204);
-});
+protectedApp.put("/:id", sValidator("json", updateAuthorSchema), async c => {
+  const id = c.req.param("id")
+  const data = c.req.valid("json")
+
+  const [author] = await db
+    .update(AuthorTable)
+    .set(data)
+    .where(eq(AuthorTable.id, id))
+    .returning()
+
+  if (author == null) {
+    return c.json({ error: "Author not found" }, 404)
+  }
+
+  return c.json(author)
+})
+
+protectedApp.delete("/:id", async c => {
+  const id = c.req.param("id")
+  await db.delete(AuthorTable).where(eq(AuthorTable.id, id))
+
+  return c.body(null, 204)
+})
+
+app.route("/", protectedApp)
 export default app;
